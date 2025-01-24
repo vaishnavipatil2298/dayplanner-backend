@@ -1,0 +1,20 @@
+# Ignore the virtual environment folder
+venv/
+
+# Ignore the data folder (if it contains local files)
+data/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# Ignore IDE-specific files
+.vscode/
+.idea/
+
+# Ignore the requirements.txt file (if you don't want to track it)
+# requirements.txt
