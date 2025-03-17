@@ -1,41 +1,31 @@
-import sqlite3
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from typing import Generator
 
+# Use SQLite for development
+SQLALCHEMY_DATABASE_URL = "sqlite:///./dayplanner.db"
+# For PostgreSQL, use:
+# SQLALCHEMY_DATABASE_URL = "postgresql://user:password@localhost/dbname"
 
-# Connect to the database
-conn = sqlite3.connect("data/tasks.db")
-cursor = conn.cursor()
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Create tasks table
-# cursor.execute('''
-# CREATE TABLE IF NOT EXISTS tasks (
-#     id INTEGER PRIMARY KEY AUTOINCREMENT,
-#     task TEXT NOT NULL,
-#     time TEXT NOT NULL,
-#     completed INTEGER DEFAULT 0
-# )
-# ''')
-# conn.commit()
+Base = declarative_base()
 
- 
-# Add a task
-def add_task(task, time):
-    cursor.execute('''
-    INSERT INTO tasks (task, time)
-    VALUES (?, ?)
-    ''', (task, time))
-    conn.commit()
-
-# View all tasks
-def view_tasks():
-    cursor.execute('SELECT * FROM tasks')
-    return cursor.fetchall()
-
-# Mark a task as completed
-def mark_task_completed(task_id):
-    cursor.execute('''
-    UPDATE tasks
-    SET completed = 1
-    WHERE id = ?
-    ''', (task_id,))
-    conn.commit()
+# Dependency to get DB session
+def get_db() -> Generator[Session, None, None]:
+    """
+    Creates a database session and handles cleanup.
+    
+    Yields:
+        Session: SQLAlchemy database session
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 

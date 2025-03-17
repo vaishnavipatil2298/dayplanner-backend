@@ -1,21 +1,23 @@
 import schedule
 import time
-from datetime import datetime, timedelta
-from typing import Callable, Dict, Optional
+from datetime import datetime, timedelta, date
+from typing import Callable, Dict, Optional, List, Any
+from sqlalchemy.orm import Session
+from .task_manager import Task
 
 class TaskScheduler:
     def __init__(self):
-        self.pending_tasks = {}
-        self.active_tasks = {}
-        self.recurring_tasks = {}
+        self.pending_tasks: Dict[str, Dict[str, Any]] = {}
+        self.active_tasks: Dict[str, Dict[str, Any]] = {}
+        self.recurring_tasks: Dict[str, Dict[str, Any]] = {}
     
     def schedule_task(
         self,
         task_name: str,
-        task_func: Callable,
+        task_func: Callable[[], bool],  # Specify return type
         scheduled_time: str,
         priority: int = 1,
-        recurring: str = None,  # 'daily', 'weekly', 'monthly'
+        recurring: Optional[str] = None,  # 'daily', 'weekly', 'monthly'
         duration_minutes: int = 30
     ) -> bool:
         """
@@ -23,12 +25,21 @@ class TaskScheduler:
         
         Args:
             task_name: Name of the task
-            task_func: Function to execute
+            task_func: Function to execute, should return bool indicating success
             scheduled_time: Time in "HH:MM" format
             priority: Task priority (1-5, 1 being highest)
             recurring: Frequency of recurring task
-            duration_minutes: Expected task duration
+            duration_minutes: Expected task duration in minutes
+            
+        Returns:
+            bool: True if task was scheduled successfully
+        
+        Raises:
+            ValueError: If priority is not between 1 and 5
         """
+        if not 1 <= priority <= 5:
+            raise ValueError("Priority must be between 1 and 5")
+
         def wrapped_task():
             try:
                 # Mark task as active
@@ -124,7 +135,16 @@ class TaskScheduler:
         duration: int,
         priority: int
     ) -> datetime:
-        """Find next available time slot based on duration and priority"""
+        """
+        Find next available time slot based on duration and priority
+        
+        Args:
+            duration: Task duration in minutes
+            priority: Task priority level
+            
+        Returns:
+            datetime: Next available time slot
+        """
         # Simple implementation - can be enhanced with more complex logic
         next_slot = datetime.now() + timedelta(hours=1)
         return next_slot
@@ -139,3 +159,46 @@ class TaskScheduler:
             except Exception as e:
                 print(f"Error in scheduler: {e}")
                 time.sleep(60)  # Continue running even if there's an error    
+
+    @staticmethod
+    def get_tasks_for_date(db: Session, target_date: date) -> List[Task]:
+        return db.query(Task).filter(Task.due_date == target_date).all()
+    
+    @staticmethod
+    def reschedule_overdue_tasks(db: Session):
+        today = date.today()
+        overdue_tasks = db.query(Task).filter(
+            Task.due_date < today,
+            Task.completed == False
+        ).all()
+        
+        for task in overdue_tasks:
+            task.due_date = today
+        
+        db.commit()
+        return overdue_tasks
+    
+    @staticmethod
+    def optimize_schedule(db: Session, target_date: date) -> List[Task]:
+        """
+        Optimize the schedule for a given date
+        
+        Args:
+            db: Database session
+            target_date: Date to optimize schedule for
+            
+        Returns:
+            List[Task]: Optimized list of tasks
+        """
+        tasks = db.query(Task).filter(
+            Task.due_date == target_date,
+            Task.completed == False
+        ).order_by(Task.priority.desc()).all()
+        
+        # TODO: Implement scheduling optimization logic
+        # Consider:
+        # - Task priorities
+        # - Task durations
+        # - Working hours
+        # - Breaks between tasks
+        return tasks    
